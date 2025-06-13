@@ -1,2 +1,0 @@
-# PyAV
-Python Antivirus
