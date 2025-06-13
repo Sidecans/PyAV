@@ -69,6 +69,45 @@ def scan(directory, hashes):
         infected.append(full_path)
   print(f"Scan Completed. {len(infected)} infected files found.")
   return infected
+def virustotal_scan(filepath):
+  print(f"{Fore.YELLOW}[*]{Fore.RESET} Scanning {filepath} with VirusTotal...")
+  url = "https://www.virustotal.com/vtapi/v2/file/scan"
+  try:
+    VT_API_KEY = None
+    headers = {"x-apikey": VT_API_KEY} # Replace with your VirusTotal API key
+  except:
+    print(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
+  try:
+    with open(filepath, "rb") as f:
+        files = {"file": (os.path.basename(file_path), f)}
+        response = requests.post(url, files=files, headers=headers)
+        if response.status_code == 200:
+            analysis_id = response.json()["data"]["id"]
+            return check_virustotal_result(analysis_id)
+        else:
+            print(f"{Fore.RED}[!]{Fore.RESET} Submission failed: {response.status_code}")
+            print(response.json())
+  except Exception as e:
+    print(f"[!] Error scanning file: {e}")
+
+def check_virustotal_result(analysis_id):
+  print("[⏳] Waiting for VirusTotal analysis...")
+  headers = {"x-apikey": VT_API_KEY}
+  url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
+
+  for _ in range(10):
+      response = requests.get(url, headers=headers)
+      if response.status_code == 200:
+          data = response.json()
+          status = data["data"]["attributes"]["status"]
+          if status == "completed":
+              stats = data["data"]["attributes"]["stats"]
+              malicious = stats.get("malicious", 0)
+              suspicious = stats.get("suspicious", 0)
+              print(f"[*] VirusTotal results: {malicious} malicious, {suspicious} suspicious")
+              return
+      time.sleep(3)
+  print(f"{Fore.RED}[!]{Fore.RESET} Timeout waiting for analysis results.")
 
 if __name__ = "__main__":
   sync_hashes()
