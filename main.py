@@ -32,14 +32,14 @@ def get_hashes():
     if response.status_code == 200:
       return response.text
   except Exception as e:
-    print(f"{Fore.RED}[!]{Fore.RESET} Error retrieving signatures: {e}")
+    log(f"{Fore.RED}[!]{Fore.RESET} Error retrieving signatures: {e}")
   return None
 
 def hash_string(content):
   return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 def sync_hashes():
-  print(f"{Fore.YELLOW}[*]{Fore.RESET} Syncing hashes...")
+  log(f"{Fore.YELLOW}[*]{Fore.RESET} Syncing hashes...")
   content = get_hashes()
   if not content:
     return False
@@ -49,7 +49,7 @@ def sync_hashes():
     with open(HASH_META_FILE, "rb") as f:
       previous_hash = f.read().strip()
   if remote_hash == previous_hash:
-    print(f"{Fore.GREEN}[*]{Fore.RESET} Virus signature list is up-to-date.")
+    log(f"{Fore.GREEN}[*]{Fore.RESET} Virus signature list is up-to-date.")
     return True
 
   with open(hashFile, 'w') as f:
@@ -72,7 +72,7 @@ def calculate(filepath):
     return None
 
 def scan(directory, hashes):
-  print("Scanning...")
+  log("Scanning...")
   infected = []
   for root, _, files, in os.walk(directory):
     for f in files:
@@ -81,17 +81,21 @@ def scan(directory, hashes):
       if not hash:
         continue
       if hash in hashes:
-        print(f"{Fore.RED}[!]{Fore.RESET} Infected File Found: {full_path}")
+        log(f"{Fore.RED}[!]{Fore.RESET} Infected File Found: {full_path}")
         infected.append(full_path)
-  print(f"Scan Completed. {len(infected)} infected files found.")
+  log(f"Scan Completed. {len(infected)} infected files found.")
   return infected
+
+
+
+
 def virustotal_scan(filepath):
-  print(f"{Fore.YELLOW}[*]{Fore.RESET} Scanning {filepath} with VirusTotal...")
+  log(f"{Fore.YELLOW}[*]{Fore.RESET} Scanning {filepath} with VirusTotal...")
   url = "https://www.virustotal.com/vtapi/v2/file/scan"
   try:
     headers = {"x-apikey": VT_API_KEY}
   except:
-    print(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
+    log(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
   try:
     with open(filepath, "rb") as f:
         files = {"file": (os.path.basename(filepath), f)}
@@ -100,10 +104,10 @@ def virustotal_scan(filepath):
             analysis_id = response.json()["data"]["id"]
             return check_virustotal_result(analysis_id)
         else:
-            print(f"{Fore.RED}[!]{Fore.RESET} Submission failed: {response.status_code}")
+            log(f"{Fore.RED}[!]{Fore.RESET} Submission failed: {response.status_code}")
             print(response.json())
   except Exception as e:
-    print(f"[!] Error scanning file: {e}")
+    log(f"[!] Error scanning file: {e}")
 
 def quarantine(filepath):
   quar_check()
@@ -111,14 +115,14 @@ def quarantine(filepath):
     filename = os.path.basename(filepath)
     dest = os.path.join(QUARANTINE_DIR, filename)
     shutil.move(filepath, dest)
-    print(f"{Fore.GREEN}[!]{Fore.RESET} Moved {filepath} to quarantine.")
+    log(f"{Fore.GREEN}[!]{Fore.RESET} Moved {filepath} to quarantine.")
   except Exception as e:
-    print(f"{Fore.RED}[!]{Fore.RESET} Error moving {filepath} to quarantine: {e}")
+    log(f"{Fore.RED}[!]{Fore.RESET} Error moving {filepath} to quarantine: {e}")
 
 
 
 def check_virustotal_result(analysis_id):
-  print("[⏳] Waiting for VirusTotal analysis...")
+  log("[⏳] Waiting for VirusTotal analysis...")
   try:
     headers = {"x-apikey": VT_API_KEY}
     url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
@@ -132,12 +136,45 @@ def check_virustotal_result(analysis_id):
                 stats = data["data"]["attributes"]["stats"]
                 malicious = stats.get("malicious", 0)
                 suspicious = stats.get("suspicious", 0)
-                print(f"[*] VirusTotal results: {malicious} malicious, {suspicious} suspicious")
+                log(f"[*] VirusTotal results: {malicious} malicious, {suspicious} suspicious")
                 return
         time.sleep(3)
-    print(f"{Fore.RED}[!]{Fore.RESET} Timeout waiting for analysis results.")
+    log(f"{Fore.RED}[!]{Fore.RESET} Timeout waiting for analysis results.")
   except:
-    print(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
+    log(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
+
+
+
+def print_menu():
+  print("""\n===PvAV===
+  1. Update Virus Signatures
+  2. Scan a directory
+  3. Deep Scan a file with VirusTotal
+  4. Exit""")
+
+def menu():
+  sigs = set()
+  while True:
+    print_menu()
+    choice = input("Select an Option")
+    if choice == "1":
+      sync_hashes()
+      sigs = load_hashes()
+    elif choice == "2":
+      path = input("Enter the directory to scan: ").strip()
+      if not os.path.isdir(path):
+        log(f"{Fore.YELLOW}[!]{Fore.RESET} Invalid directory.")
+        continue
+      if not sigs:
+        sigs = load_hashes()
+      scan(path, sigs)
+    elif choice == "3":
+      filepath = input("Enter the full file path: ").strip()
+      if os.path.isfile(filepath):
+        virustotal_scan(filepath)
+      else:
+        log(f"{Fore.RED}[!]{Fore.RESET} Invalid file path.")
+    
 if __name__ = "__main__":
   sync_hashes()
   md5_sigs = load_hashes()
