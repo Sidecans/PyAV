@@ -13,6 +13,7 @@ hashFile = "hashes.txt"
 HASH_META_FILE = "hash.meta"
 VT_API_KEY = None # Define your VirusTotal API key here
 LOG_FILE = "log.txt"
+QUARANTINE_DIR = "quarantine"
 
 def log(message):
   timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
@@ -21,6 +22,10 @@ def log(message):
   with open(LOG_FILE, "a") as log_file:
       log_file.write(entry + "\n")
 
+def quar_check():
+  if not os.path.exists(QUARANTINE_DIR):
+    os.makedirs(QUARANTINE_DIR)
+    
 def get_hashes():
   try:
     response = requests.get(f"{server_url}/get-hashes")
@@ -99,6 +104,18 @@ def virustotal_scan(filepath):
             print(response.json())
   except Exception as e:
     print(f"[!] Error scanning file: {e}")
+
+def quarantine(filepath):
+  quar_check()
+  try:
+    filename = os.path.basename(filepath)
+    dest = os.path.join(QUARANTINE_DIR, filename)
+    shutil.move(filepath, dest)
+    print(f"{Fore.GREEN}[!]{Fore.RESET} Moved {filepath} to quarantine.")
+  except Exception as e:
+    print(f"{Fore.RED}[!]{Fore.RESET} Error moving {filepath} to quarantine: {e}")
+
+
 
 def check_virustotal_result(analysis_id):
   print("[⏳] Waiting for VirusTotal analysis...")
