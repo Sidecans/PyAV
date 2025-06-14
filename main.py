@@ -4,11 +4,22 @@ import requests
 import time
 import platform
 from colorama import Fore, Style
-
+import shutil
+import argparse
+from datetime import datetime
 
 server_url = None # Define the server URL here
 hashFile = "hashes.txt"
 HASH_META_FILE = "hash.meta"
+VT_API_KEY = None # Define your VirusTotal API key here
+LOG_FILE = "log.txt"
+
+def log(message):
+  timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+  entry = f"{timestamp} {message}"
+  print(entry)
+  with open(LOG_FILE, "a") as log_file:
+      log_file.write(entry + "\n")
 
 def get_hashes():
   try:
@@ -73,13 +84,12 @@ def virustotal_scan(filepath):
   print(f"{Fore.YELLOW}[*]{Fore.RESET} Scanning {filepath} with VirusTotal...")
   url = "https://www.virustotal.com/vtapi/v2/file/scan"
   try:
-    VT_API_KEY = None
-    headers = {"x-apikey": VT_API_KEY} # Replace with your VirusTotal API key
+    headers = {"x-apikey": VT_API_KEY}
   except:
     print(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
   try:
     with open(filepath, "rb") as f:
-        files = {"file": (os.path.basename(file_path), f)}
+        files = {"file": (os.path.basename(filepath), f)}
         response = requests.post(url, files=files, headers=headers)
         if response.status_code == 200:
             analysis_id = response.json()["data"]["id"]
@@ -92,23 +102,25 @@ def virustotal_scan(filepath):
 
 def check_virustotal_result(analysis_id):
   print("[⏳] Waiting for VirusTotal analysis...")
-  headers = {"x-apikey": VT_API_KEY}
-  url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
-
-  for _ in range(10):
-      response = requests.get(url, headers=headers)
-      if response.status_code == 200:
-          data = response.json()
-          status = data["data"]["attributes"]["status"]
-          if status == "completed":
-              stats = data["data"]["attributes"]["stats"]
-              malicious = stats.get("malicious", 0)
-              suspicious = stats.get("suspicious", 0)
-              print(f"[*] VirusTotal results: {malicious} malicious, {suspicious} suspicious")
-              return
-      time.sleep(3)
-  print(f"{Fore.RED}[!]{Fore.RESET} Timeout waiting for analysis results.")
-
+  try:
+    headers = {"x-apikey": VT_API_KEY}
+    url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
+  
+    for _ in range(10):
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            status = data["data"]["attributes"]["status"]
+            if status == "completed":
+                stats = data["data"]["attributes"]["stats"]
+                malicious = stats.get("malicious", 0)
+                suspicious = stats.get("suspicious", 0)
+                print(f"[*] VirusTotal results: {malicious} malicious, {suspicious} suspicious")
+                return
+        time.sleep(3)
+    print(f"{Fore.RED}[!]{Fore.RESET} Timeout waiting for analysis results.")
+  except:
+    print(f"{Fore.RED}[!]{Fore.RESET} VirusTotal API key not found.")
 if __name__ = "__main__":
   sync_hashes()
   md5_sigs = load_hashes()
