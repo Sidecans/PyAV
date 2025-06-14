@@ -174,8 +174,28 @@ def menu():
         virustotal_scan(filepath)
       else:
         log(f"{Fore.RED}[!]{Fore.RESET} Invalid file path.")
-    
-if __name__ = "__main__":
-  sync_hashes()
-  md5_sigs = load_hashes()
+    elif choice == "4":
+      log(f"{Fore.YELLOW}[*]{Fore.RESET} Exiting...")
+      break
+
+def cli():
+  parser = argparse.ArgumentParser(description="PvAV")
+  parser.add_argument("--update", action="store_true", help="Update virus signatures")
+  parser.add_argument("--scan", type=str, help="Scan a directory")
+  parser.add_argument("--deep", type=str, help="Scan a file with VirusTotal")
+  args = parser.parse_args()
+
+  if args.update:
+      sync_hashes()
+  if args.scan:
+      sigs = load_hashes()
+      scan(args.scan, sigs)
+  if args.deep:
+      virustotal_scan(args.deep)
+  if not any(vars(args).values()):
+      menu()
+
+  
+if __name__ == "__main__":
+  cli()
   
